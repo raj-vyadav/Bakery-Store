@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bakery Menu</title>
+</head>
+<body>
+    <h1>Our Bakery Menu</h1>
+    <div id="products"></div>
+
+    <script>
+        fetch('http://127.0.0.1:8000/api/products/')
+            .then(response => response.json())
+            .then(data => {
+                let container = document.getElementById('products');
+                data.forEach(product => {
+                    let item = document.createElement('div');
+                    item.innerHTML = `<h3>${product.name}</h3>
+                                      <p>${product.description}</p>
+                                      <p>Price: $${product.price}</p>`;
+                    container.appendChild(item);
+                });
+            });
+    </script>
+</body>
+</html>
