@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Your Orders{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Your Order History <i class="fas fa-receipt"></i></h1>
+<div id="orders-container">
+    </div>
+<div id="no-orders-message" class="text-center p-5 border rounded border-secondary" style="display: none;">
+    <h2>You have no past orders.</h2>
+    <a href="{% url 'home' %}" class="btn btn-primary">Start Shopping</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ordersContainer = document.getElementById('orders-container');
+    const noOrdersMessage = document.getElementById('no-orders-message');
+
+    fetch('/api/orders/')
+        .then(res => res.json())
+        .then(orders => {
+            if (orders.length === 0) {
+                noOrdersMessage.style.display = 'block';
+                return;
+            }
+
+            orders.forEach(order => {
+                const orderDate = new Date(order.created_at).toLocaleDateString();
+                const orderCard = `
+                    <div class="card mb-3 text-light">
+                        <div class="card-header d-flex justify-content-between">
+                            <span><strong>Order #${order.id}</strong></span>
+                            <span>Placed on: ${orderDate}</span>
+                        </div>
+                        <div class="card-body ">
+                            <ul class="list-group list-group-flush ">
+                                ${order.items.map(item => `
+                                    <li class="list-group-item bg-transparent d-flex justify-content-between text-light">
+                                        <span>${item.quantity} x ${item.product.name}</span>
+                                        <span>$${(item.quantity * item.price).toFixed(2)}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        <div class="card-footer text-end">
+                            <h5>Total: $${order.total_amount}</h5>
+                        </div>
+                    </div>
+                `;
+                ordersContainer.insertAdjacentHTML('beforeend', orderCard);
+            });
+        })
+        .catch(err => console.error('Error fetching orders:', err));
+});
+</script>
+{% endblock %}

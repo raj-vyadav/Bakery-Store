@@ -1,12 +1,169 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 
-{% block title %}
-Cart Page
-{% endblock %}
+{% block title %}Your Shopping Cart{% endblock %}
 
 {% block content %}
-
-{% block script_js %}
-
+<h1 class="mb-4">Your Shopping Cart <i class="fas fa-shopping-cart"></i></h1>
+<div id="cart-container">
+    </div>
+<div id="cart-summary" class="mt-4 text-end" style="display: none;">
+    <h3>Total: $<span id="cart-total">0.00</span></h3>
+    <button id="checkout-btn" class="btn btn-lg btn-success">
+        <i class="fas fa-credit-card"></i> Proceed to Checkout
+    </button>
+</div>
+<div id="empty-cart-message" class="text-center p-5 border rounded border-secondary" style="display: none;">
+    <h2>Your cart is empty!</h2>
+    <p>Looks like you haven't added anything to your cart yet.</p>
+    <a href="{% url 'home' %}" class="btn btn-primary">Start Shopping</a>
+</div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cartContainer = document.getElementById('cart-container');
+    const cartSummary = document.getElementById('cart-summary');
+    const cartTotalSpan = document.getElementById('cart-total');
+    const emptyCartMessage = document.getElementById('empty-cart-message');
+    const checkoutBtn = document.getElementById('checkout-btn');
+    const csrftoken = getCookie('csrftoken');
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function renderCart(items) {
+        cartContainer.innerHTML = '';
+        if (items.length === 0) {
+            cartSummary.style.display = 'none';
+            emptyCartMessage.style.display = 'block';
+            return;
+        }
+
+        cartSummary.style.display = 'block';
+        emptyCartMessage.style.display = 'none';
+        let total = 0;
+
+        const table = `
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Price</th>
+                        <th class="text-center">Quantity</th>
+                        <th>Total</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map(item => {
+                        total += parseFloat(item.total_price);
+                        return `
+                            <tr>
+                                <td>${item.product_name}</td>
+                                <td>$${item.product_price}</td>
+                                <td class="text-center">
+                                    <input type="number" class="form-control quantity-input" value="${item.quantity}" min="1" data-item-id="${item.id}" style="width: 70px; display: inline-block;">
+                                </td>
+                                <td>$${item.total_price}</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-danger remove-item-btn" data-item-id="${item.id}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>`;
+
+        cartContainer.innerHTML = table;
+        cartTotalSpan.textContent = total.toFixed(2);
+    }
+
+    function fetchCart() {
+        fetch('/api/cart/')
+            .then(res => res.json())
+            .then(data => renderCart(data))
+            .catch(err => console.error('Error fetching cart:', err));
+    }
+
+    function updateCartItem(itemId, quantity) {
+        fetch('/api/cart/', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            body: JSON.stringify({ item_id: itemId, quantity: quantity })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Update failed');
+            fetchCart(); // Re-render the cart
+        })
+        .catch(err => console.error('Error updating cart:', err));
+    }
+
+    function removeCartItem(itemId) {
+        fetch('/api/cart/', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            body: JSON.stringify({ item_id: itemId })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Delete failed');
+            fetchCart(); // Re-render the cart
+        })
+        .catch(err => console.error('Error removing item:', err));
+    }
+
+    cartContainer.addEventListener('change', e => {
+        if (e.target.classList.contains('quantity-input')) {
+            const itemId = e.target.dataset.itemId;
+            const quantity = parseInt(e.target.value, 10);
+            if (quantity > 0) {
+                updateCartItem(itemId, quantity);
+            }
+        }
+    });
+
+    cartContainer.addEventListener('click', e => {
+        const button = e.target.closest('.remove-item-btn');
+        if (button) {
+            const itemId = button.dataset.itemId;
+            if (confirm('Are you sure you want to remove this item?')) {
+                removeCartItem(itemId);
+            }
+        }
+    });
+
+    checkoutBtn.addEventListener('click', () => {
+        if (confirm('Proceed with checkout?')) {
+            fetch('/api/checkout/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrftoken }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Checkout failed');
+                return res.json();
+            })
+            .then(order => {
+                alert(`Checkout successful! Your order number is #${order.id}.`);
+                window.location.href = "{% url 'order-page' %}";
+            })
+            .catch(err => alert('An error occurred during checkout.'));
+        }
+    });
+
+    fetchCart();
+});
+</script>
 {% endblock %}
